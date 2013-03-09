@@ -27,20 +27,21 @@ class Manager(object):
         animeName, epStart, epEnd = self._getUpdateData(filename)
         # epStart and epEnd are for the spans, e.g. ep 1-4
         # We'll still have some use of them for filtering
-        self._ep = epStart if not epEnd else epEnd
-        if(self._ep == None):
-            self._ep = 1
-        malEntries = Finder().find(animeName)
+        ep = epStart if not epEnd else epEnd
+        if(ep == ''):
+            ep = 1
+        malEntries = Finder().find(animeName, ep)
         self._animelist = ListFetcher(self._username).fetch()
         filterer = ResultsFilterer(self._animelist, animeName, filename)
         result = filterer.selectFrom(malEntries)
         if(result and not dryRun):
             u = Updater(self._username, self._password, self._animelist)
-            u.update(result, self._ep)
+            u.update(result)
         else:
             print("(Dry run) Mal Updater Result: ")
             print(result)
-            print("Episode: {}".format(self._ep))
+            if(result):
+                print("Episode: {}".format(result.watchedEpisode))
 
 
 class ListFetcher(object):
@@ -97,17 +98,17 @@ class Updater(object):
         self._username = username
         self._animelist = animelist
 
-    def update(self, malEntry, episode):
+    def update(self, malEntry):
         if(malEntry.id in self._animelist):
-            if(self._animelist[malEntry.id].episodesSeen >= episode):
+            if(self._animelist[malEntry.id].episodesSeen >= malEntry.episodeWatched):
                 return
             url = "http://myanimelist.net/api/animelist/update/{}.xml"
         else:
             url = "http://myanimelist.net/api/animelist/add/{}.xml"
-        self._executeApiCall(url, malEntry, episode)
+        self._executeApiCall(url, malEntry)
 
-    def _executeApiCall(self, url, malEntry, episode):
-        if(malEntry.episodeCount == episode):
+    def _executeApiCall(self, url, malEntry):
+        if(malEntry.episodeCount == malEntry.episodeWatched):
             status = "completed"
         else:
             status = "watching"
@@ -117,7 +118,7 @@ class Updater(object):
         request.add_header("Authorization", "Basic {}".format(auth))
         postData = {
                     "data": self.UPDATE_TEMPLATE.format(
-                                                        episode,
+                                                        malEntry.episodeWatched,
                                                         status,
                                                         "syncplay")
                     }
@@ -126,12 +127,12 @@ class Updater(object):
 
 
 class Finder(object):
-    def find(self, name):
+    def find(self, name, ep):
         malLookup = "site:http://myanimelist.net/anime/ -inurl:.php {}"
         data = pygoogle(malLookup.format(name)).get_urls()
-        return self.__extractResults(data)
+        return self.__extractResults(data, ep)
 
-    def __extractResults(self, data):
+    def __extractResults(self, data, ep):
         results = []
         ids = []
         for link in data:
@@ -146,6 +147,7 @@ class Finder(object):
             data = urllib2.urlopen(listUrl).read()
             data = json.loads(data)
             result = Entry(data)
+            result.setEpisodeWatched(ep)
             results.append(result)
         return results
 
@@ -194,7 +196,15 @@ class Entry(object):
         self.watchedStatus = searchResults.get("watched_status")
 
         self.matchBoost = 0
-
+        self.episodeWatched = 0
+        
+    def setEpisodeWatched(self, ep):
+        '''
+        Episode that's currently being watched by user,
+        this number can be changed by filters and will be sent on MAL on update
+        '''
+        self.episodeWatched = ep
+             
     def __repr__(self, *args, **kwargs):
         return "{}|{}|(boost={})".format(
                                          self.id,
