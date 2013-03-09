@@ -5,6 +5,9 @@ import base64
 from ._pygoogle import pygoogle
 from . import AnimeInfoExtractor
 import re
+from libMal.filters.FirstGoogleResultFilter import FirstGoogleResultFilter
+from libMal.filters.SequelFilter import SequelFilter
+from libMal.filters.MostSimilarNameFilter import MostSimilarNameFilter
 
 
 class Manager(object):
@@ -25,9 +28,11 @@ class Manager(object):
         # epStart and epEnd are for the spans, e.g. ep 1-4
         # We'll still have some use of them for filtering
         self._ep = epStart if not epEnd else epEnd
+        if(self._ep == None):
+            self._ep = 1
         malEntries = Finder().find(animeName)
         self._animelist = ListFetcher(self._username).fetch()
-        filterer = ResultsFilterer(self._animelist, animeName)
+        filterer = ResultsFilterer(self._animelist, animeName, filename)
         result = filterer.selectFrom(malEntries)
         if(result and not dryRun):
             u = Updater(self._username, self._password, self._animelist)
@@ -57,12 +62,17 @@ class ListFetcher(object):
 
 
 class ResultsFilterer(object):
-    def __init__(self, animelist, showName):
+    def __init__(self, animelist, showName, filename):
         self._animelist = animelist
         self._showName = showName
+        self._filename = filename
 
     def _findBestMatch(self, malEntries):
-        return malEntries[0]
+        args = (self._filename, self._animelist, malEntries)
+        FirstGoogleResultFilter(*args).filterResults()
+        SequelFilter(*args).filterResults()
+        MostSimilarNameFilter(*args).filterResults()
+        return sorted(malEntries, key=lambda e: e.matchBoost, reverse=True)[0]
 
     def selectFrom(self, malEntries):
         if (len(malEntries) > 1):
@@ -112,10 +122,10 @@ class Updater(object):
                                                         "syncplay")
                     }
         request.add_data(urllib.urlencode(postData))
+        urllib2.urlopen(request).read()
 
 
 class Finder(object):
-
     def find(self, name):
         malLookup = "site:http://myanimelist.net/anime/ -inurl:.php {}"
         data = pygoogle(malLookup.format(name)).get_urls()
@@ -144,12 +154,13 @@ class Entry(object):
     def __init__(self, searchResults):
         self.id = searchResults.get("id")
 
+        self.mainTitle = searchResults.get("title")
         self.titles = []
         self.titles.append(searchResults.get("title"))
         otherTitles = searchResults.get("other_titles", {})
-        self.titles.append(otherTitles.get("english", []))
-        self.titles.append(otherTitles.get("japanese", []))
-        self.titles.extend(otherTitles.get("synonyms", []))
+        self.titles.extend(otherTitles.get("english", ""))
+        self.titles.extend(otherTitles.get("japanese", ""))
+        self.titles.extend(otherTitles.get("synonyms", ""))
 
         self.malRank = searchResults.get("rank")
         self.malPopularity = searchResults.get("popularity_rank")
@@ -190,15 +201,3 @@ class Entry(object):
                                          self.titles[0],
                                          self.matchBoost
                                          )
-
-
-class BaseFilter(object):
-    def __init__(self, filename, userlist, searchResults, options={}):
-        self._userlist = userlist
-        self._results = searchResults
-
-    def getScoreChange(self):
-        return 0
-
-    def filterResults(self):
-        return self.results
