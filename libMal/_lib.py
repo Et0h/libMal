@@ -113,8 +113,6 @@ class Updater(object):
                                                         "syncplay")
                     }
         request.add_data(urllib.urlencode(postData))
-        pprint(url.format(malEntry.id))
-        pprint(urllib2.urlopen(request).read())
 
 
 class Finder(object):
