@@ -69,7 +69,7 @@ class ResultsFilterer(object):
         if (len(malEntries) > 1):
             malEntry = self._findBestMatch(malEntries)
         elif (len(malEntries) == 1):
-            malEntry = malEntries.values()[0]
+            malEntry = malEntries[0]
         elif (len(malEntries) == 0):
             malEntry = None
         return malEntry
