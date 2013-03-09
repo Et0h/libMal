@@ -3,7 +3,6 @@ import urllib2
 import json
 import base64
 from ._pygoogle import pygoogle
-from pprint import pprint
 from . import AnimeInfoExtractor
 import re
 
