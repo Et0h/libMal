@@ -8,6 +8,7 @@ import re
 from libMal.filters.FirstGoogleResultFilter import FirstGoogleResultFilter
 from libMal.filters.SequelFilter import SequelFilter
 from libMal.filters.MostSimilarNameFilter import MostSimilarNameFilter
+from libMal.filters.UserListStatusFilter import UserListStatusFilter
 
 
 class Manager(object):
@@ -41,7 +42,7 @@ class Manager(object):
             print("(Dry run) Mal Updater Result: ")
             print(result)
             if(result):
-                print("Episode: {}".format(result.watchedEpisode))
+                print("Episode: {}".format(result.episodeWatched))
 
 
 class ListFetcher(object):
@@ -73,6 +74,7 @@ class ResultsFilterer(object):
         FirstGoogleResultFilter(*args).filterResults()
         SequelFilter(*args).filterResults()
         MostSimilarNameFilter(*args).filterResults()
+        UserListStatusFilter(*args).filterResults()
         return sorted(malEntries, key=lambda e: e.matchBoost, reverse=True)[0]
 
     def selectFrom(self, malEntries):
@@ -197,14 +199,14 @@ class Entry(object):
 
         self.matchBoost = 0
         self.episodeWatched = 0
-        
+
     def setEpisodeWatched(self, ep):
         '''
         Episode that's currently being watched by user,
         this number can be changed by filters and will be sent on MAL on update
         '''
         self.episodeWatched = ep
-             
+
     def __repr__(self, *args, **kwargs):
         return "{}|{}|(boost={})".format(
                                          self.id,
