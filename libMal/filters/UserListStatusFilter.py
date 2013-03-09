@@ -31,7 +31,7 @@ class UserListStatusFilter(BaseFilter):
                     else:
                         entry.matchBoost += 2.5
                 elif entryOnList.watchedStatus == "plan to watch":
-                    if int(entryOnList.episodesSeen) == 1:
+                    if int(entry.episodeWatched) == 1:
                         entry.matchBoost += 6
                     else:
                         entry.matchBoost += 1
