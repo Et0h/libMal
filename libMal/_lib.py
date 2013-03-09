@@ -105,7 +105,7 @@ class Updater(object):
         request = urllib2.Request(url.format(malEntry.id))
         login = '{}:{}'.format(self._username, self._password)
         auth = base64.encodestring(login).replace('\n', '')
-        request.add_header("Authorization", "Basic [}".format(auth))
+        request.add_header("Authorization", "Basic {}".format(auth))
         postData = {
                     "data": self.UPDATE_TEMPLATE.format(
                                                         episode,
