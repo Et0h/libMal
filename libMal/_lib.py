@@ -62,7 +62,7 @@ class ResultsFilterer(object):
         self._showName = showName
 
     def _findBestMatch(self, malEntries):
-        return malEntries.values()[0]
+        return malEntries[0]
 
     def selectFrom(self, malEntries):
         if (len(malEntries) > 1):
@@ -124,7 +124,7 @@ class Finder(object):
         return self.__extractResults(data)
 
     def __extractResults(self, data):
-        results = {}
+        results = []
         ids = []
         for link in data:
             m = re.search("myanimelist.net/anime/(\d+)", link)
@@ -138,7 +138,7 @@ class Finder(object):
             data = urllib2.urlopen(listUrl).read()
             data = json.loads(data)
             result = Entry(data)
-            results[data["id"]] = result
+            results.append(result)
         return results
 
 
@@ -183,6 +183,8 @@ class Entry(object):
         self.episodesSeen = searchResults.get("watched_episodes")
         self.userScore = searchResults.get("score")
         self.watchedStatus = searchResults.get("watched_status")
+
+        self.matchBoost = 0
 
     def __repr__(self, *args, **kwargs):
         return "{}|{}|(b={})".format(self.id, self.titles[0], self.matchBoost)
