@@ -34,8 +34,9 @@ class Manager(object):
             u = Updater(self._username, self._password, self._animelist)
             u.update(result, self._ep)
         else:
-            print("Mal Updater Result: ")
-            pprint(result)
+            print("(Dry run) Mal Updater Result: ")
+            print(result)
+            print("Episode: {}".format(self._ep))
 
 
 class ListFetcher(object):
@@ -187,7 +188,11 @@ class Entry(object):
         self.matchBoost = 0
 
     def __repr__(self, *args, **kwargs):
-        return "{}|{}|(b={})".format(self.id, self.titles[0], self.matchBoost)
+        return "{}|{}|(boost={})".format(
+                                         self.id,
+                                         self.titles[0],
+                                         self.matchBoost
+                                         )
 
 
 class BaseFilter(object):
