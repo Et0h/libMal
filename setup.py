@@ -7,5 +7,5 @@ setup(name='libmal',
       author='Robert "Uriziel" Musil',
       author_email='urizieli@gmail.com',
       license='MIT',
-      packages=['libMal'],
+      packages=['libMal', 'libMal.filters'],
       zip_safe=False)
