@@ -10,13 +10,12 @@ from libMal._AnimeInfoExtractor import AnimeInfoExtractor
 
 class MostSimilarNameFilter(BaseFilter):
     '''
-    Boost first result from google a little bit
+    Find titles that are similar to extracted show name
     '''
-    SCORE_BOOST = 2
-
     def filterResults(self):
         showName = AnimeInfoExtractor(self._filename).getName()
         for entry in self._results:
             if difflib.get_close_matches(showName, entry.titles, 3, 0.9) != []:
                 entry.matchBoost += 2
-#                print "SimilarName boost +2: {}".format(entry.mainTitle)
+            if difflib.get_close_matches(showName, entry.titles, 3, 0.8) != []:
+                entry.matchBoost += 0.5

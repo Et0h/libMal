@@ -7,11 +7,8 @@ Created on 9 Mar 2013
 
 class BaseFilter(object):
     '''
-    Maximum score change from this filter
-    Purely informational value
+    Base class for filters
     '''
-    SCORE_BOOST = 0
-
     def __init__(self, filename, userlist, searchResults, options={}):
         self._filename = filename
         self._userlist = userlist

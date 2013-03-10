@@ -16,27 +16,39 @@ class UserListStatusFilter(BaseFilter):
     Small boost for anime in dropped if following episode
     Minimal minus boost for anime in completed
     '''
-    SCORE_BOOST = 6
-
     def filterResults(self):
         for entry in self._results:
             entryOnList = self._userlist.get(entry.id)
             if entryOnList:
-                dif = int(entry.episodeWatched) - int(entryOnList.episodesSeen)
+                epWatched = int(entry.episodeBeingWatched)
+                epOnList = int(entryOnList.episodesSeen)
+                diff = epWatched - epOnList
                 if entryOnList.watchedStatus == "watching":
-                    if dif == 1:
-                        entry.matchBoost += 6
-                    elif dif <= 3:
-                        entry.matchBoost += 4
-                    else:
-                        entry.matchBoost += 2.5
+                    self._boostEntryInWatching(entry, diff)
                 elif entryOnList.watchedStatus == "plan to watch":
-                    if int(entry.episodeWatched) == 1:
-                        entry.matchBoost += 6
-                    else:
-                        entry.matchBoost += 1
+                    self._boostEntryInPlanToWatch(entry)
                 elif entryOnList.watchedStatus == "completed":
-                    entry.matchBoost -= 0.1
-                elif entryOnList.watchedStatus == "dropped":
-                    if dif == 1:
-                        entry.matchBoost += 1
+                    self._boostEntryInCompleted(entry)
+                elif entryOnList.watchedStatus in ["on-hold", "dropped"]:
+                    self._boostEntryInDropped(entry, diff)
+
+    def _boostEntryInWatching(self, entry, diff):
+        if diff == 1:
+            entry.matchBoost += 6
+        elif diff <= 3:
+            entry.matchBoost += 4
+        else:
+            entry.matchBoost += 2.5
+
+    def _boostEntryInPlanToWatch(self, entry):
+        if int(entry.episodeBeingWatched) == 1:
+            entry.matchBoost += 6
+        else:
+            entry.matchBoost += 2
+
+    def _boostEntryInCompleted(self, entry):
+        entry.matchBoost -= 0.1
+
+    def _boostEntryInDropped(self, entry, diff):
+        if diff == 1:
+            entry.matchBoost += 2

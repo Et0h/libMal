@@ -12,40 +12,80 @@ from libMal.filters.UserListStatusFilter import UserListStatusFilter
 
 
 class Manager(object):
+    '''
+    Support for updating anime list on MAL
+    '''
     def __init__(self, username, password):
         self._username = username
         self._password = password
         self._animelist = None
-        self._ep = 0
 
-    def _getUpdateData(self, filename):
-        f = AnimeInfoExtractor(filename)
-        animeName = f.getName()
-        epStart, epEnd = f.getEpisodeNumbers()
-        return animeName, epStart, epEnd
+    def findEntriesOnMal(self, filename, options={}):
+        '''
+        Look for shows that are probably associated with filename
+        Ordered by best match
+        @return: list of libMal.Entry
+        @param filename: Name of file played
+        @param options: Dict of options, usually you're fine with defaults.
+            Options consisting of:
+            "extractor": instance compatible with libMal.AnimeInfoExtractor
+            "finder": instance compatible with libMal.Finder
+            "list_fetcher": instance compatible with libMal.ListFetcher
+            "filterer": instance compatible with libMal.ResultsFilterer
+        '''
+        animeName, ep = self._extractDataFromFilename(filename, options)
+        finder = options.get("finder", Finder())
+        malEntries = finder.find(animeName, ep)
+        listFetcher = options.get("list_fetcher", ListFetcher(self._username))
+        self._animelist = listFetcher.fetch()
+        filterer = options.get("filterer", ResultsFilterer(self._animelist,
+                                                          animeName, filename))
+        results = filterer.scoreEntries(malEntries)
+        return results
 
-    def performListUpdate(self, filename, dryRun=False):
-        animeName, epStart, epEnd = self._getUpdateData(filename)
+    def updateEntryOnMal(self, entry, options={}):
+        '''
+        Update user's list with given entry
+        Best to use with libMal.Manager.findEntriesOnMal
+        @param entry: Properly initialised libMal.Entry
+        @param options: Dict of options, usually you're fine with defaults.
+            Options consisting of:
+            "updater": instance compatible with libMal.Updater
+        '''
+        if(entry):
+            args = (self._username, self._password, self._animelist)
+            updater = options.get("updater", Updater(*args))
+            updater.update(entry)
+
+    def performAutomaticListUpdate(self, filename):
+        '''
+        Perform update on best search result using default options
+        @param filename: Name of file to update
+        '''
+        results = self.findEntriesOnMal(filename)
+        if(len(results) > 0):
+            result = results[0]
+            self.updateEntryOnMal(result)
+
+    def __sanitizeEpisodeNumberForUpdating(self, epStart, epEnd):
+        ep = epStart if epEnd == '' else epEnd
+        ep = ep if ep != '' else '1'
+        return ep
+
+    def _extractDataFromFilename(self, filename, options):
+        extractor = options.get("extractor", AnimeInfoExtractor(filename))
+        animeName = extractor.getName()
         # epStart and epEnd are for the spans, e.g. ep 1-4
-        # We'll still have some use of them for filtering
-        ep = epStart if not epEnd else epEnd
-        if(ep == ''):
-            ep = 1
-        malEntries = Finder().find(animeName, ep)
-        self._animelist = ListFetcher(self._username).fetch()
-        filterer = ResultsFilterer(self._animelist, animeName, filename)
-        result = filterer.selectFrom(malEntries)
-        if(result and not dryRun):
-            u = Updater(self._username, self._password, self._animelist)
-            u.update(result)
-        else:
-            print("(Dry run) Mal Updater Result: ")
-            print(result)
-            if(result):
-                print("Episode: {}".format(result.episodeWatched))
+        epStart, epEnd = extractor.getEpisodeNumbers()
+        ep = self.__sanitizeEpisodeNumberForUpdating(epStart, epEnd)
+        return animeName, ep
 
 
 class ListFetcher(object):
+    '''
+    Downloads and parses AnimeList of user.
+    Users unofficial mal api (http://mal-api.com)
+    '''
     def __init__(self, username):
         self._username = username
 
@@ -57,6 +97,9 @@ class ListFetcher(object):
         return results
 
     def fetch(self):
+        '''
+        @return: Id indexed dict of user list
+        '''
         listUrl = "http://mal-api.com/animelist/{}".format(self._username)
         data = urllib2.urlopen(listUrl).read()
         data = json.loads(data)
@@ -64,45 +107,49 @@ class ListFetcher(object):
 
 
 class ResultsFilterer(object):
+    '''
+    Using internal filters find the best search result
+    '''
     def __init__(self, animelist, showName, filename):
         self._animelist = animelist
         self._showName = showName
         self._filename = filename
 
-    def _findBestMatch(self, malEntries):
+    '''
+    @param malEntries: Search results
+    '''
+    def scoreEntries(self, malEntries):
         args = (self._filename, self._animelist, malEntries)
         FirstGoogleResultFilter(*args).filterResults()
         SequelFilter(*args).filterResults()
         MostSimilarNameFilter(*args).filterResults()
         UserListStatusFilter(*args).filterResults()
-        return sorted(malEntries, key=lambda e: e.matchBoost, reverse=True)[0]
-
-    def selectFrom(self, malEntries):
-        if (len(malEntries) > 1):
-            malEntry = self._findBestMatch(malEntries)
-        elif (len(malEntries) == 1):
-            malEntry = malEntries[0]
-        elif (len(malEntries) == 0):
-            malEntry = None
-        return malEntry
+        return sorted(malEntries, key=lambda e: e.matchBoost, reverse=True)
 
 
 class Updater(object):
-    UPDATE_TEMPLATE = '''<?xml version="1.0" encoding="UTF-8"?>
-<entry>
-    <episode>{}</episode>
-    <status>{}</status>
-    <tags>{}</tags>
-</entry>'''
+    '''
+    For updating user's anime list
+    '''
+    UPDATE_TEMPLATE = str('<?xml version="1.0" encoding="UTF-8"?>\n'
+                          '<entry>\n'
+                          '    <episode>{}</episode>\n'
+                          '    <status>{}</status>\n'
+                          '    <tags>{}</tags>\n'
+                          '</entry>\n')
 
     def __init__(self, username, password, animelist):
         self._password = password
         self._username = username
         self._animelist = animelist
 
+    '''
+    Do update list
+    '''
     def update(self, malEntry):
         if(malEntry.id in self._animelist):
-            if(self._animelist[malEntry.id].episodesSeen >= malEntry.episodeWatched):
+            epsOnList = self._animelist[malEntry.id].episodesSeen
+            if(epsOnList >= malEntry.episodeBeingWatched):
                 return
             url = "http://myanimelist.net/api/animelist/update/{}.xml"
         else:
@@ -110,7 +157,7 @@ class Updater(object):
         self._executeApiCall(url, malEntry)
 
     def _executeApiCall(self, url, malEntry):
-        if(malEntry.episodeCount == malEntry.episodeWatched):
+        if(malEntry.episodeCount == malEntry.episodeBeingWatched):
             status = "completed"
         else:
             status = "watching"
@@ -120,15 +167,20 @@ class Updater(object):
         request.add_header("Authorization", "Basic {}".format(auth))
         postData = {
                     "data": self.UPDATE_TEMPLATE.format(
-                                                        malEntry.episodeWatched,
-                                                        status,
-                                                        "syncplay")
+                                                  malEntry.episodeBeingWatched,
+                                                  status,
+                                                  "syncplay")
                     }
         request.add_data(urllib.urlencode(postData))
         urllib2.urlopen(request).read()
 
 
 class Finder(object):
+    '''
+    Lookup MAL entries given the show name
+    Uses google search engine
+    '''
+
     def find(self, name, ep):
         malLookup = "site:http://myanimelist.net/anime/ -inurl:.php {}"
         data = pygoogle(malLookup.format(name)).get_urls()
@@ -198,18 +250,20 @@ class Entry(object):
         self.watchedStatus = searchResults.get("watched_status")
 
         self.matchBoost = 0
-        self.episodeWatched = 0
+        self.episodeBeingWatched = 0
 
     def setEpisodeWatched(self, ep):
         '''
         Episode that's currently being watched by user,
         this number can be changed by filters and will be sent on MAL on update
         '''
-        self.episodeWatched = ep
+        self.episodeBeingWatched = ep
 
     def __repr__(self, *args, **kwargs):
-        return "{}|{}|(boost={})".format(
-                                         self.id,
-                                         self.titles[0],
-                                         self.matchBoost
-                                         )
+        return repr({
+                      'Id': self.id,
+                      'Title': self.mainTitle,
+                      'Episode being watched': self.episodeBeingWatched,
+                      'Url': "http://myanimelist.net/anime/{}".format(self.id),
+                      'Boost': self.matchBoost
+                      })
