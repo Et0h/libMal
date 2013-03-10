@@ -7,10 +7,15 @@ Work in progress, don't expect it to do anything just yet
 
 Example usage:
 
+      from libMal import Manager
+      import sys
       if __name__ == '__main__':
-          from libMal import Manager
-          import sys
           username = sys.argv[1]
           password = sys.argv[2]
           filename = " ".join(sys.argv[3:])
-          Manager(username, password).performListUpdate(filename, dryRun=True)
+          manager = Manager(username, password)
+          results = manager.findEntriesOnMal(filename)
+          #for r in results:
+          #    print r
+          if(len(results) > 0):
+              manager.updateEntryOnMal(results[0])
