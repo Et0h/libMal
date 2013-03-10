@@ -51,10 +51,13 @@ class Manager(object):
         @param options: Dict of options, usually you're fine with defaults.
             Options consisting of:
             "updater": instance compatible with libMal.Updater
+            "tags": list of tags to set up
         '''
         if(entry):
             args = (self._username, self._password, self._animelist)
             updater = options.get("updater", Updater(*args))
+            tags  = options.get("tags", [])
+            updater.setTags(tags)
             updater.update(entry)
 
     def performAutomaticListUpdate(self, filename):
@@ -142,11 +145,18 @@ class Updater(object):
         self._password = password
         self._username = username
         self._animelist = animelist
+        self._tags = ""
+        
+    def setTags(self, tags=[]):
+        '''
+        Add some tags for 
+        '''
+        self._tags = ", ".join(tags) 
 
-    '''
-    Do update list
-    '''
     def update(self, malEntry):
+        '''
+        Do update list
+        '''
         if(malEntry.id in self._animelist):
             epsOnList = self._animelist[malEntry.id].episodesSeen
             if(epsOnList >= malEntry.episodeBeingWatched):
@@ -169,7 +179,7 @@ class Updater(object):
                     "data": self.UPDATE_TEMPLATE.format(
                                                   malEntry.episodeBeingWatched,
                                                   status,
-                                                  "syncplay")
+                                                  self._tags)
                     }
         request.add_data(urllib.urlencode(postData))
         urllib2.urlopen(request).read()
